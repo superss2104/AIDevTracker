@@ -44,13 +44,13 @@ AI-Dev-Tracker addresses this by creating a Git-linked AI interaction logging an
 ---
 
 ## 🏗️ System Architecture
-<img width="1372" height="479" alt="architecture_UML" src="https://github.com/user-attachments/assets/ca3de1e2-db95-43ea-b320-964ed79dc793" />
+<img width="1372" height="479" alt="architecture_UML" src="https://github.com/user-attachments/assets/edcbb4a6-e8aa-4694-9a26-22e3d74ea95f" />
 
 
 ---
 
 ## 🔄 Workflow Chart
-<img width="733" height="782" alt="workflow" src="https://github.com/user-attachments/assets/75d0a359-2660-42fd-ac6a-6f35300e8954" />
+<img width="733" height="782" alt="workflow" src="https://github.com/user-attachments/assets/419aa2ab-6d49-429c-ab5b-6e8f835b93bd" />
 
 
 ---
@@ -105,7 +105,7 @@ These metrics help identify:
 
 - Shivam – System Architecture & Core Implementation
 - Suhail – API Testing & Database Design
-- Sreeja – System Architecture , workflow diagram & readme file
+- Sreeja – Documentation, System Architecture & workflow chart
 - Anil – Testing & CLI Validation
 - Harsith – Research & Architectural Drift Study
 
