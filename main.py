@@ -8,61 +8,61 @@ init_db()
 
 
 def ask(prompt, file_path=None):
+
     print("\nThinking...\n")
 
-    response = ask_gpt(prompt)
+    ai_result = ask_gpt(prompt)
+
+    response_text = ai_result["text"]
+    model_used = ai_result["model"]
+    response_time = ai_result["response_time"]
 
     print("AI Response:\n")
-    print(response)
+    print(response_text)
 
     commit_hash = get_current_commit()
 
-    save_interaction(prompt, response, file_path, commit_hash)
+    prompt_length = len(prompt)
+    response_length = len(response_text)
 
-    print("\n✔ Interaction saved successfully.\n")
+    relevance = 1 if file_path else 0
 
-
-def analyze():
-    print("\nRunning analysis...\n")
-    analyze_repo()
-    generate_report()
-
-
-def status():
-    print("\nAI Dev Tracker Status:")
-    print("----------------------")
-    print("Database initialized.")
-    print("Git linked.")
-    print("Ready to track AI development.\n")
+    save_interaction(
+        prompt,
+        response_text,
+        file_path,
+        commit_hash,
+        prompt_length,
+        response_length,
+        model_used,
+        response_time,
+        relevance
+    )
 
 
 if __name__ == "__main__":
 
     if len(sys.argv) < 2:
-        print("\nUsage:")
-        print("  python main.py ask \"your prompt\" optional_file.py")
-        print("  python main.py analyze")
-        print("  python main.py status\n")
+        print("""
+Usage:
+  python main.py ask "prompt" optional_file.py
+  python main.py analyze
+  python main.py report
+        """)
         sys.exit(1)
 
     command = sys.argv[1]
 
     if command == "ask":
-
-        if len(sys.argv) < 3:
-            print("Error: Please provide a prompt.")
-            sys.exit(1)
-
         prompt = sys.argv[2]
         file_path = sys.argv[3] if len(sys.argv) > 3 else None
-
         ask(prompt, file_path)
 
     elif command == "analyze":
-        analyze()
+        analyze_repo()
 
-    elif command == "status":
-        status()
+    elif command == "report":
+        generate_report()
 
     else:
         print("Unknown command.")

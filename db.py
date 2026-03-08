@@ -2,22 +2,26 @@
 import sqlite3
 from datetime import datetime
 
-DB_NAME = "history.db"
+DB_NAME = "ai_dev_tracker.db"
+
 
 def init_db():
     conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
+    cursor = conn.cursor()
 
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS history (
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS interactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             prompt TEXT,
             response TEXT,
             file_path TEXT,
             commit_hash TEXT,
             timestamp TEXT,
-            relevance_score REAL,
-            is_relevant INTEGER
+            prompt_length INTEGER,
+            response_length INTEGER,
+            model_used TEXT,
+            response_time REAL,
+            relevance INTEGER
         )
     """)
 
@@ -25,37 +29,29 @@ def init_db():
     conn.close()
 
 
-def save_interaction(prompt, response, file_path, commit_hash):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
+def save_interaction(prompt, response, file_path, commit_hash,
+                     prompt_length, response_length,
+                     model_used, response_time, relevance):
 
-    c.execute("""
-        INSERT INTO history (prompt, response, file_path, commit_hash, timestamp)
-        VALUES (?, ?, ?, ?, ?)
-    """, (prompt, response, file_path, commit_hash, datetime.now()))
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    cursor.execute("""
+        INSERT INTO interactions (
+            prompt, response, file_path, commit_hash, timestamp,
+            prompt_length, response_length, model_used,
+            response_time, relevance
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        prompt, response, file_path, commit_hash, timestamp,
+        prompt_length, response_length,
+        model_used, response_time, relevance
+    ))
 
     conn.commit()
     conn.close()
 
-
-def fetch_all():
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("SELECT * FROM history")
-    rows = c.fetchall()
-    conn.close()
-    return rows
-
-
-def update_relevance(id, score, is_relevant):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-
-    c.execute("""
-        UPDATE history
-        SET relevance_score = ?, is_relevant = ?
-        WHERE id = ?
-    """, (score, int(is_relevant), id))
-
-    conn.commit()
-    conn.close()
+    print("✔ Interaction saved successfully.")
