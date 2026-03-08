@@ -1,46 +1,96 @@
-from difflib import SequenceMatcher
-from db import fetch_all, update_relevance
+import sqlite3
+from collections import defaultdict
+from datetime import datetime, timedelta
+
+DB_NAME = "ai_dev_tracker.db"
 
 
-def calculate_similarity(text1, text2):
-    return SequenceMatcher(None, text1, text2).ratio()
+def fetch_data():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM interactions")
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
 
 
 def analyze_repo():
-    records = fetch_all()
 
-    for record in records:
-        id = record[0]
-        response = record[2]
-        file_path = record[3]
+    rows = fetch_data()
 
-        if not file_path:
-            continue
+    total = len(rows)
+    relevant = sum(row[10] for row in rows)
+    irrelevant = total - relevant
 
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                file_content = f.read()
+    file_usage = defaultdict(int)
+    timestamps_by_file = defaultdict(list)
 
-            score = calculate_similarity(response, file_content)
+    for row in rows:
+        file_path = row[3]
+        timestamp = row[5]
 
-            is_relevant = score > 0.4
+        if file_path:
+            file_usage[file_path] += 1
+            timestamps_by_file[file_path].append(timestamp)
 
-            update_relevance(id, score, is_relevant)
+    print("\n===== AI ANALYSIS =====")
+    print(f"Total Prompts: {total}")
+    print(f"Relevant Prompts: {relevant}")
+    print(f"Irrelevant Prompts: {irrelevant}")
 
-        except:
-            continue
+    print("\nPrompts Per File:")
+    for file, count in file_usage.items():
+        print(f"{file} → {count}")
 
-    print("Analysis complete.")
+    detect_struggles(timestamps_by_file)
+
+
+def detect_struggles(timestamps_by_file):
+
+    print("\nPotential Struggle Zones:")
+    found = False
+
+    for file, timestamps in timestamps_by_file.items():
+
+        times = [datetime.strptime(t, "%Y-%m-%d %H:%M:%S") for t in timestamps]
+        times.sort()
+
+        for i in range(len(times) - 2):
+            if times[i + 2] - times[i] <= timedelta(minutes=30):
+                print(f"⚠ High AI dependency detected on {file}")
+                found = True
+                break
+
+    if not found:
+        print("No major struggle zones detected.")
 
 
 def generate_report():
-    records = fetch_all()
 
-    total = len(records)
-    relevant = len([r for r in records if r[7] == 1])
+    rows = fetch_data()
 
-    print("\n====== AI CONTRIBUTION REPORT ======")
+    total = len(rows)
+    file_usage = defaultdict(int)
+    model_usage = defaultdict(int)
+
+    for row in rows:
+        file_path = row[3]
+        model = row[8]
+
+        if file_path:
+            file_usage[file_path] += 1
+
+        model_usage[model] += 1
+
+    print("\n===== AI DEVELOPMENT REPORT =====")
     print(f"Total Prompts: {total}")
-    print(f"Relevant Prompts: {relevant}")
-    print(f"Irrelevant Prompts: {total - relevant}")
-    print("====================================\n")
+
+    if file_usage:
+        top_file = max(file_usage, key=file_usage.get)
+        print(f"Most AI Assisted File: {top_file}")
+
+    print("\nModel Usage:")
+    for model, count in model_usage.items():
+        print(f"{model} → {count}")
+
+    print("=================================\n")
