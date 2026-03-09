@@ -2,10 +2,12 @@ import os
 import time
 from google import genai
 from dotenv import load_dotenv
+from db import get_recent_interactions
 
 load_dotenv()
 
 MODEL_NAME = "models/gemini-2.5-flash"
+MAX_HISTORY = 5
 
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
@@ -14,10 +16,19 @@ def ask_gpt(prompt):
 
     start_time = time.time()
 
+    # Build conversation history for context
+    history = get_recent_interactions(MAX_HISTORY)
+    contents = []
+    for past_prompt, past_response in history:
+        contents.append({"role": "user", "parts": [{"text": past_prompt}]})
+        contents.append({"role": "model", "parts": [{"text": past_response}]})
+    # Append current prompt
+    contents.append({"role": "user", "parts": [{"text": prompt}]})
+
     try:
         response = client.models.generate_content(
             model=MODEL_NAME,
-            contents=prompt,
+            contents=contents,
         )
 
         end_time = time.time()
