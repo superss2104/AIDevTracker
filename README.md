@@ -50,8 +50,7 @@ AI-Dev-Tracker addresses this by creating a Git-linked AI interaction logging an
 ---
 
 ## 🔄 Workflow Chart
-<img width="733" height="782" alt="workflow" src="https://github.com/user-attachments/assets/419aa2ab-6d49-429c-ab5b-6e8f835b93bd" />
-
+<img src="images/architecture.png" width="700">
 
 ---
 
