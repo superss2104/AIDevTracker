@@ -41,16 +41,20 @@ AI-Dev-Tracker addresses this by creating a Git-linked AI interaction logging an
 - AI contribution reporting
 - Offline mock AI support (for stable testing)
 
+
 ---
 
 ## 🏗️ System Architecture
-<img width="1372" height="479" alt="architecture_UML" src="https://github.com/user-attachments/assets/edcbb4a6-e8aa-4694-9a26-22e3d74ea95f" />
 
+
+
+![WhatsApp Image 2026-03-17 at 8 34 41 AM](https://github.com/user-attachments/assets/4ecb67f4-06d6-4578-864d-d555f8ed498a)
 
 ---
 
 ## 🔄 Workflow Chart
-<img src="images/architecture.png" width="700">
+
+![WhatsApp Image 2026-03-14 at 1 38 14 PM](https://github.com/user-attachments/assets/734ade65-a637-4657-9090-1daf89aeaa31)
 
 ---
 
