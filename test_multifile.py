@@ -13,6 +13,8 @@ Uses direct DB inserts (mock) to avoid API calls.
 
 import os
 import sys
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8')
 import sqlite3
 from datetime import datetime, timedelta
 

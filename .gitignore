@@ -44,3 +44,26 @@ htmlcov/
 .cache
 nosetests.xml
 coverage.xml
+
+# ── Project-specific ──────────────────────────────────────────────────────────
+
+# SQLite databases (local runtime data — never push to GitHub)
+*.db
+*.sqlite
+*.sqlite3
+history.db
+ai_dev_tracker.db
+
+# Exported CSV data files
+*.csv
+ai_dev_tracker_export.csv
+
+# Environment variables (API keys — NEVER commit)
+.env
+# Keep a safe template so teammates know what keys are needed:
+# .env.example  ← commit this instead (with blank/placeholder values)
+
+# Python type-check caches
+.mypy_cache/
+.dmypy.json
+dmypy.json

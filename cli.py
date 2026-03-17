@@ -23,11 +23,13 @@ def set_active_session_id(session_id):
         f.write(str(session_id))
 
 
-def run(ask_fn):
+def run(ask_fn, threshold=0.4):
     """Main CLI entry point. Parses commands and routes to handlers.
-    
+
     Args:
-        ask_fn: The ask() function from main.py for handling 'ask' commands.
+        ask_fn    : The ask() function from main.py for handling 'ask' commands.
+        threshold : Active relevance threshold (float 0.0–1.0), resolved in main.py
+                    from .env or --threshold CLI flag.
     """
 
     # Lazy imports to avoid circular dependencies
@@ -35,27 +37,34 @@ def run(ask_fn):
     from visualizer import show_summary, show_file_summary
     from db import export_to_csv
 
+    # ── Strip --threshold from argv before command routing ────────────────
+    args = sys.argv[1:]
+    if "--threshold" in args:
+        idx = args.index("--threshold")
+        args = [a for i, a in enumerate(args) if i != idx and i != idx + 1]
+        sys.argv = [sys.argv[0]] + args
+
     session_id = get_active_session_id()
 
     # Command registry — add new commands here
     commands = {
-        "ask":       {"handler": _handle_ask,       "args": True,  "help": 'ask "prompt" [file.py]'},
-        "analyze":   {"handler": None,              "args": True,  "help": "analyze [file.py]"},
-        "report":    {"handler": lambda: generate_report(session_id=session_id),"args": False, "help": "report"},
-        "visualize": {"handler": lambda: _handle_visualize(session_id), "args": False, "help": "visualize"},
-        "export":    {"handler": None,               "args": True,  "help": "export [output.csv]"},
-        "session":   {"handler": None,               "args": True,  "help": "session <new|list|use> [args]"},
+        "ask":       {"args": True,  "help": 'ask "prompt" [file.py]'},
+        "analyze":   {"args": True,  "help": "analyze [file.py]  [uses active threshold]"},
+        "report":    {"args": False, "help": "report   [uses active threshold]"},
+        "visualize": {"args": False, "help": "visualize"},
+        "export":    {"args": True,  "help": "export [output.csv]"},
+        "session":   {"args": True,  "help": "session <new|list|use> [args]"},
     }
 
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help", "help"):
-        _print_usage(commands)
+        _print_usage(commands, threshold)
         sys.exit(0 if len(sys.argv) >= 2 else 1)
 
     command = sys.argv[1]
 
     if command not in commands:
         print(f"Unknown command: '{command}'")
-        _print_usage(commands)
+        _print_usage(commands, threshold)
         sys.exit(1)
 
     if command == "ask":
@@ -65,13 +74,16 @@ def run(ask_fn):
             sys.exit(1)
         prompt = sys.argv[2]
         file_path = sys.argv[3] if len(sys.argv) > 3 else None
-        ask_fn(prompt, file_path, session_id=session_id)
+        ask_fn(prompt, file_path, session_id=session_id, threshold=threshold)
 
     elif command == "analyze":
         if len(sys.argv) > 2:
             analyze_file(sys.argv[2], session_id=session_id)
         else:
-            analyze_repo(session_id=session_id)
+            analyze_repo(session_id=session_id, threshold=threshold)
+
+    elif command == "report":
+        generate_report(session_id=session_id, threshold=threshold)
 
     elif command == "export":
         filepath = sys.argv[2] if len(sys.argv) > 2 else "ai_dev_tracker_export.csv"
@@ -84,12 +96,7 @@ def run(ask_fn):
         _handle_session()
 
     else:
-        commands[command]["handler"]()
-
-
-def _handle_ask(ask_fn, args):
-    """Handled inline in run() for clarity."""
-    pass
+        print(f"Unknown command: '{command}'")
 
 
 def _handle_visualize(session_id=None):
@@ -164,11 +171,18 @@ def _handle_session():
         sys.exit(1)
 
 
-def _print_usage(commands):
-    """Prints help text with all available commands."""
+def _print_usage(commands, threshold=0.4):
+    """Prints help text with all available commands and active threshold."""
     print("\nAI-Dev-Tracker — CLI Usage\n")
-    print("  python main.py <command> [arguments]\n")
+    print(f"  Active Relevance Threshold : {threshold}")
+    print("  (Set via RELEVANCE_THRESHOLD in .env or override with --threshold <value>)\n")
+    print("  python main.py [--threshold <0.0-1.0>] <command> [arguments]\n")
     print("Available commands:")
     for name, info in commands.items():
-        print(f"  {info['help']:40s}")
+        print(f"  {info['help']:45s}")
+    print()
+    print("Examples:")
+    print('  python main.py ask "How do I use async/await?" main.py')
+    print('  python main.py --threshold 0.6 analyze')
+    print('  python main.py --threshold 0.8 report')
     print()

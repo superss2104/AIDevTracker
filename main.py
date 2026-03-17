@@ -1,14 +1,37 @@
 import sys
 if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8')
+import os
 import re
 from difflib import SequenceMatcher
+from dotenv import load_dotenv
 from db import init_db, save_interaction, get_first_response_for_file
 from ai_client import ask_gpt
 from git_utils import get_current_commit
 from cli import run
 
-RELEVANCE_THRESHOLD = 0.4
+load_dotenv()
+
+init_db()
+
+
+# ── Resolve relevance threshold ──────────────────────────────────────────────
+# Priority: CLI flag (--threshold x) > .env RELEVANCE_THRESHOLD > hardcoded 0.4
+def _get_threshold():
+    """Extract --threshold from sys.argv if present, else fall back to .env."""
+    threshold = float(os.getenv("RELEVANCE_THRESHOLD", 0.4))
+    args = sys.argv[1:]
+    if "--threshold" in args:
+        idx = args.index("--threshold")
+        try:
+            threshold = float(args[idx + 1])
+        except (IndexError, ValueError):
+            print("Warning: --threshold requires a numeric value (e.g. --threshold 0.6). Using default.")
+    return threshold
+
+
+THRESHOLD = _get_threshold()
+
 
 # Common English stopwords to ignore during keyword comparison
 STOPWORDS = {
@@ -26,8 +49,6 @@ STOPWORDS = {
     "you", "your", "he", "him", "his", "she", "her", "they", "them", "their",
     "here", "there", "up", "down", "then", "once", "also", "s", "t", "re",
 }
-
-init_db()
 
 
 def _tokenize(text):
@@ -47,7 +68,6 @@ def _keyword_overlap(text_a, text_b):
         return 0.0
 
     shared = tokens_a & tokens_b
-    # Divide by the smaller set so short but relevant responses score high
     min_size = min(len(tokens_a), len(tokens_b))
     return len(shared) / min_size
 
@@ -77,9 +97,12 @@ def compute_relevance(response_text, file_path, session_id=None):
     return round(final, 4)
 
 
-def ask(prompt, file_path=None, session_id=None):
+def ask(prompt, file_path=None, session_id=None, threshold=None):
+    """Send a prompt to the AI, log interaction, and score relevance."""
+    if threshold is None:
+        threshold = THRESHOLD
 
-    print("\nThinking...\n")
+    print(f"\nThinking...  [threshold={threshold}]\n")
 
     ai_result = ask_gpt(prompt, session_id=session_id)
 
@@ -96,9 +119,9 @@ def ask(prompt, file_path=None, session_id=None):
     response_length = len(response_text)
 
     relevance_score = compute_relevance(response_text, file_path, session_id=session_id)
-    relevance = 1 if relevance_score >= RELEVANCE_THRESHOLD else 0
+    relevance = 1 if relevance_score >= threshold else 0
 
-    print(f"\n📊 Relevance Score: {relevance_score:.4f} ({'AI-contributed' if relevance else 'Not contributing'})")
+    print(f"\n📊 Relevance Score: {relevance_score:.4f} ({'AI-contributed' if relevance else 'Not contributing'}) [threshold={threshold}]")
 
     save_interaction(
         prompt,
@@ -115,4 +138,4 @@ def ask(prompt, file_path=None, session_id=None):
 
 
 if __name__ == "__main__":
-    run(ask)
+    run(ask, threshold=THRESHOLD)
