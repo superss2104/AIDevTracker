@@ -7,18 +7,21 @@ from db import get_recent_interactions
 
 load_dotenv()
 
+# Prevent "Both GOOGLE_API_KEY and GEMINI_API_KEY are set" warning
+os.environ.pop("GOOGLE_API_KEY", None)
+
 MODEL_NAME = "models/gemini-2.5-flash"
 MAX_HISTORY = 5
 
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 
-def ask_gpt(prompt):
+def ask_gpt(prompt, session_id=None):
 
     start_time = time.time()
 
-    # Build conversation history for context
-    history = get_recent_interactions(MAX_HISTORY)
+    # Build conversation history for context (scoped to session)
+    history = get_recent_interactions(MAX_HISTORY, session_id=session_id)
     contents = []
     for past_prompt, past_response in history:
         contents.append({"role": "user", "parts": [{"text": past_prompt}]})

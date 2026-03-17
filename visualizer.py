@@ -1,18 +1,23 @@
 from collections import defaultdict
-from db import get_all_interactions
+from db import get_all_interactions, get_session_by_id
 
 
-def show_summary():
-    """Displays a tabular summary of all logged prompt interactions."""
+def show_summary(session_id=None):
+    """Displays a tabular summary of logged prompt interactions."""
 
-    rows = get_all_interactions()
+    rows = get_all_interactions(session_id=session_id)
 
     if not rows:
         print("\n  No interactions found in the database.")
         return
 
     print("\n" + "=" * 100)
-    print("  DATABASE VISUALIZATION — Prompt Log Summary")
+    title = "  DATABASE VISUALIZATION — Prompt Log Summary"
+    if session_id is not None:
+        session = get_session_by_id(session_id)
+        if session:
+            title += f"  [Session #{session[0]}: {session[1]}]"
+    print(title)
     print("=" * 100)
 
     # Table header
@@ -37,10 +42,10 @@ def show_summary():
     print(f"  Total: {len(rows)} interactions\n")
 
 
-def show_file_summary():
+def show_file_summary(session_id=None):
     """Displays per-file prompt count as an ASCII bar chart."""
 
-    rows = get_all_interactions()
+    rows = get_all_interactions(session_id=session_id)
 
     if not rows:
         print("\n  No interactions found.")
@@ -57,7 +62,12 @@ def show_file_summary():
             no_file_count += 1
 
     print("\n" + "=" * 60)
-    print("  FILE USAGE SUMMARY")
+    title = "  FILE USAGE SUMMARY"
+    if session_id is not None:
+        session = get_session_by_id(session_id)
+        if session:
+            title += f"  [Session #{session[0]}: {session[1]}]"
+    print(title)
     print("=" * 60)
 
     if file_counts:
