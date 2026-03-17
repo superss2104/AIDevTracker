@@ -1,5 +1,7 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
+import ast
+import os
 from db import get_all_interactions, get_time_gaps
 
 
@@ -175,3 +177,132 @@ def generate_report():
     print("\n" + "=" * 50)
     print("       End of Report")
     print("=" * 50 + "\n")
+
+
+def get_dependencies(file_path):
+    if not os.path.exists(file_path):
+        return []
+    
+    with open(file_path, "r", encoding="utf-8") as f:
+        source = f.read()
+        
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+        
+    deps = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                deps.add(alias.name.split('.')[0])
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                deps.add(node.module.split('.')[0])
+                
+    # Filter to only local matching Python files/packages
+    local_deps = []
+    base_dir = os.path.dirname(os.path.abspath(file_path)) or "."
+    for dep in deps:
+        if os.path.exists(os.path.join(base_dir, f"{dep}.py")) or os.path.isdir(os.path.join(base_dir, dep)):
+            local_deps.append(dep)
+            
+    return sorted(local_deps)
+
+
+def analyze_file(target_file):
+    rows = get_all_interactions()
+    
+    # Filter interactions for the specific file
+    file_rows = [row for row in rows if row[3] == target_file]
+    
+    total = len(file_rows)
+    relevant = sum(row[10] for row in file_rows if row[10] is not None) if total > 0 else 0
+    irrelevant = total - relevant
+    
+    print(f"\n===== AI ANALYSIS FOR: {target_file} =====")
+    print(f"Total Prompts: {total}")
+    print(f"Relevant Prompts: {relevant}")
+    print(f"Irrelevant Prompts: {irrelevant}")
+        
+    # Dependencies
+    deps = get_dependencies(target_file)
+    if deps:
+        print("\nLocal Dependencies:")
+        for dep in deps:
+            print(f"  - {dep}")
+    else:
+        print("\nLocal Dependencies: None")
+        
+    # Struggle Factor
+    if total > 0:
+        time_data = get_time_gaps()
+        gaps = []
+        for entry in time_data:
+            if entry["file"] == target_file:
+                gaps = entry["gaps_minutes"]
+                break
+                
+        score, category, details = calculate_struggle_score(gaps, irrelevant, total)
+        
+        print(f"\nStruggle Score: {score}/100 ({category})")
+        if details:
+            for detail in details:
+                print(f"  - {detail}")
+        else:
+            print("  - Output structure behaves normally.")
+    
+    # Footer
+    print("\n" + "=" * 50)
+    print("       End of Report")
+    print("=" * 50 + "\n")
+
+
+def calculate_struggle_score(gaps, irrelevant_count, total_prompts):
+    """Calculates a 0-100 struggle score and assigns a severity category."""
+    score = 0
+    details = []
+    
+    # 1. Volume (max 40)
+    if total_prompts > 1:
+        volume_penalty = min(total_prompts * 5, 40)
+        score += volume_penalty
+        if volume_penalty >= 20:
+            details.append(f"High prompt volume ({total_prompts} questions)")
+            
+    # 2. Irrelevance (max 20)
+    if irrelevant_count > 0:
+        irrel_penalty = min(irrelevant_count * 10, 20)
+        score += irrel_penalty
+        details.append(f"Off-topic/Irrelevant prompts detected ({irrelevant_count})")
+        
+    # 3. Time gaps
+    if gaps:
+        rapid_count = sum(1 for g in gaps if g < 3)
+        prolonged_count = sum(1 for g in gaps if 5 <= g <= 30)
+        
+        # Rapid fire (max 20)
+        if rapid_count > 0:
+            rapid_penalty = min(rapid_count * 10, 20)
+            score += rapid_penalty
+            details.append(f"Frustrated/Rapid-fire prompts detected ({rapid_count} under 3 mins)")
+            
+        # Prolonged debugger (max 20)
+        if prolonged_count > 0:
+            prolonged_penalty = min(prolonged_count * 5, 20)
+            score += prolonged_penalty
+            details.append(f"Prolonged debugging sessions detected ({prolonged_count} gaps of 5-30 mins)")
+
+    score = min(score, 100)
+    score = max(score, 0)
+    
+    if score >= 75:
+        category = "CRITICAL"
+    elif score >= 50:
+        category = "HIGH"
+    elif score >= 25:
+        category = "MODERATE"
+    else:
+        category = "LOW"
+        
+    return score, category, details

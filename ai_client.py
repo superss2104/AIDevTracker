@@ -1,5 +1,6 @@
 import os
 import time
+import difflib
 from google import genai
 from dotenv import load_dotenv
 from db import get_recent_interactions
@@ -45,3 +46,46 @@ def ask_gpt(prompt):
             "model": MODEL_NAME,
             "response_time": 0
         }
+
+
+def evaluate_relevance(base_prompt, new_prompt, file_path=None):
+    """Uses heuristics to determine if a new prompt is relevant to the 
+    base prompt and the file context.
+    Returns (score, is_relevant) where score is a 0.0-1.0 float
+    and is_relevant is 1 if score >= 0.4, else 0.
+    """
+    
+    # lowercase for more reliable matching
+    base_prompt = str(base_prompt).lower()
+    new_prompt = str(new_prompt).lower()
+    
+    score = 0.0
+    
+    # 1. Base String Overlap (0.0 to 1.0)
+    score += difflib.SequenceMatcher(None, base_prompt, new_prompt).ratio()
+    
+    # 2. File Context Boost (+0.4)
+    # If the prompt explicitly mentions the file name or 'file' or '.py'
+    if file_path:
+        filename = os.path.basename(file_path).lower()
+        name_without_ext = os.path.splitext(filename)[0]
+        if filename in new_prompt or name_without_ext in new_prompt or ".py" in new_prompt:
+            score += 0.4
+            
+    # 3. Coding/Follow-up Intent Boost (+0.3)
+    # Common words developers use to ask follow up questions about a file
+    coding_keywords = {"better", "refactor", "add", "parameter", "code", 
+                       "optimize", "fix", "improve", "update", "change", 
+                       "remove", "explain", "error", "bug", "issue",
+                       "logic", "function", "class", "method", "variable"}
+    
+    new_prompt_words = set(new_prompt.replace(".", "").replace("?", "").split())
+    if len(coding_keywords.intersection(new_prompt_words)) > 0:
+        score += 0.3
+        
+    # Cap score at 1.0
+    score = min(1.0, score)
+    
+    is_relevant = 1 if score >= 0.4 else 0
+    
+    return score, is_relevant

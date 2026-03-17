@@ -9,14 +9,14 @@ def run(ask_fn):
     """
 
     # Lazy imports to avoid circular dependencies
-    from analyzer import analyze_repo, generate_report
+    from analyzer import analyze_repo, generate_report, analyze_file
     from visualizer import show_summary, show_file_summary
     from db import export_to_csv
 
     # Command registry — add new commands here
     commands = {
         "ask":       {"handler": _handle_ask,       "args": True,  "help": 'ask "prompt" [file.py]'},
-        "analyze":   {"handler": lambda: analyze_repo(),   "args": False, "help": "analyze"},
+        "analyze":   {"handler": None,              "args": True,  "help": "analyze [file.py]"},
         "report":    {"handler": lambda: generate_report(),"args": False, "help": "report"},
         "visualize": {"handler": lambda: _handle_visualize(), "args": False, "help": "visualize"},
         "export":    {"handler": None,               "args": True,  "help": "export [output.csv]"},
@@ -41,6 +41,14 @@ def run(ask_fn):
         prompt = sys.argv[2]
         file_path = sys.argv[3] if len(sys.argv) > 3 else None
         ask_fn(prompt, file_path)
+
+    elif command == "analyze":
+        if len(sys.argv) > 2:
+            from analyzer import analyze_file
+            analyze_file(sys.argv[2])
+        else:
+            from analyzer import analyze_repo
+            analyze_repo()
 
     elif command == "export":
         filepath = sys.argv[2] if len(sys.argv) > 2 else "ai_dev_tracker_export.csv"

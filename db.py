@@ -54,7 +54,7 @@ def save_interaction(prompt, response, file_path, commit_hash,
     conn.commit()
     conn.close()
 
-    print("✔ Interaction saved successfully.")
+    print("[OK] Interaction saved successfully.")
 
 
 def get_recent_interactions(limit=5):
@@ -71,15 +71,15 @@ def get_recent_interactions(limit=5):
     return rows  # list of (prompt, response)
 
 
-def get_first_response_for_file(file_path):
-    """Returns the first AI response ever logged for a given file.
+def get_first_prompt_for_file(file_path):
+    """Returns the first AI prompt ever logged for a given file.
     This serves as the base for relevance scoring of future prompts.
     Returns None if no prior interaction exists for this file.
     """
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT response FROM interactions
+        SELECT prompt FROM interactions
         WHERE file_path = ?
         ORDER BY id ASC
         LIMIT 1
