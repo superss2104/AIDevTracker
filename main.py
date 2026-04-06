@@ -12,6 +12,81 @@ from cli import run
 
 load_dotenv()
 
+# ── Known providers (base_url, default_model) ────────────────────────────────
+PROVIDERS = {
+    "1": ("Gemini",  "https://generativelanguage.googleapis.com/v1beta/openai/", "gemini-2.0-flash"),
+    "2": ("OpenAI",  "https://api.openai.com/v1",                               "gpt-4o-mini"),
+    "3": ("Groq",    "https://api.groq.com/openai/v1",                           "llama-3.3-70b-versatile"),
+}
+
+
+def _ensure_llm_config():
+    """Prompt for LLM configuration if not already set in .env."""
+    if len(sys.argv) >= 2 and sys.argv[1] == "model":
+        return  # handled by the 'model' command
+
+    from env_utils import update_env_key, read_env_key
+
+    # ── Backward compatibility: migrate old GEMINI_API_KEY ────────────────
+    old_key = os.getenv("GEMINI_API_KEY", "").strip()
+    current_key = os.getenv("LLM_API_KEY", "").strip()
+
+    if old_key and old_key != "your_gemini_api_key_here" and not current_key:
+        # Migrate silently
+        update_env_key("LLM_API_KEY", old_key)
+        update_env_key("LLM_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
+        update_env_key("LLM_MODEL", "gemini-2.0-flash")
+        os.environ["LLM_API_KEY"] = old_key
+        os.environ["LLM_BASE_URL"] = "https://generativelanguage.googleapis.com/v1beta/openai/"
+        os.environ["LLM_MODEL"] = "gemini-2.0-flash"
+        print("✔ Migrated existing Gemini key to new LLM config.\n")
+        return
+
+    if current_key and current_key != "your_api_key_here":
+        return  # already configured
+
+    # ── Interactive provider selection ────────────────────────────────────
+    print("No LLM configuration found. Let's set one up.\n")
+    print("Select your LLM provider:")
+    for num, (name, _, _) in PROVIDERS.items():
+        print(f"  {num}. {name}")
+    print("  4. Other (custom base URL)\n")
+
+    choice = input("Enter choice (1-4): ").strip()
+
+    if choice in PROVIDERS:
+        provider_name, base_url, default_model = PROVIDERS[choice]
+        model = input(f"Model name [{default_model}]: ").strip() or default_model
+    elif choice == "4":
+        provider_name = "Custom"
+        base_url = input("Enter base URL: ").strip()
+        if not base_url:
+            print("Error: base URL cannot be empty.")
+            sys.exit(1)
+        model = input("Model name: ").strip()
+        if not model:
+            print("Error: model name cannot be empty.")
+            sys.exit(1)
+    else:
+        print("Invalid choice.")
+        sys.exit(1)
+
+    api_key = input(f"Enter your {provider_name} API key: ").strip()
+    if not api_key:
+        print("Error: API key cannot be empty.")
+        sys.exit(1)
+
+    update_env_key("LLM_API_KEY", api_key)
+    update_env_key("LLM_BASE_URL", base_url)
+    update_env_key("LLM_MODEL", model)
+    os.environ["LLM_API_KEY"] = api_key
+    os.environ["LLM_BASE_URL"] = base_url
+    os.environ["LLM_MODEL"] = model
+    print(f"✔ Configured {provider_name} ({model}) — saved to .env\n")
+
+
+_ensure_llm_config()
+
 init_db()
 
 
