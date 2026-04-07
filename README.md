@@ -33,13 +33,56 @@ AI-Dev-Tracker addresses this by creating a Git-linked AI interaction logging an
 
 ## 🚀 Key Features
 
+- **Multi-LLM support** — works with any OpenAI-compatible provider (Gemini, OpenAI, Groq, Mistral, etc.)
+- **Interactive model switching** — select a provider at startup or switch anytime via CLI
 - CLI-based prompt logging
 - AI response tracking
+- Session-based project management
 - Git commit hash integration
 - File-wise prompt mapping
 - Similarity-based relevance detection
 - AI contribution reporting
-- Offline mock AI support (for stable testing)
+- Struggle detection (rapid-prompt, sustained, escalating, long-session)
+
+---
+
+## ⚙️ Setup
+
+1. Clone the repo and install dependencies:
+   ```bash
+   pip install openai python-dotenv
+   ```
+
+2. On first run, you'll be prompted to select your LLM provider:
+   ```
+   Select your LLM provider:
+     1. Gemini
+     2. OpenAI
+     3. Groq
+     4. Other (custom base URL)
+   ```
+
+3. Or configure manually in `.env`:
+   ```env
+   LLM_API_KEY=your_api_key_here
+   LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
+   LLM_MODEL=gemini-2.5-flash
+   ```
+
+---
+
+## 🔧 CLI Commands
+
+```bash
+python main.py ask "prompt" [file.py]         # Ask the AI
+python main.py analyze [file.py]               # Run analysis
+python main.py report                          # Generate report
+python main.py visualize                       # Show visual summary
+python main.py export [output.csv]             # Export to CSV
+python main.py session <new|list|use> [args]   # Manage sessions
+python main.py model                           # Switch LLM (interactive)
+python main.py model <KEY> --base-url <URL> --model <MODEL>  # Switch LLM (direct)
+```
 
 
 ---
@@ -96,11 +139,10 @@ These metrics help identify:
 ## 🔮 Future Enhancements
 
 - Embedding-based similarity scoring
-- Multi-LLM support
 - Web dashboard visualization
 - Developer struggle heatmap
 - Architectural drift detection
-- Export reports to CSV/PDF
+- Export reports to PDF
 
 ---
 
