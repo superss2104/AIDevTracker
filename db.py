@@ -14,9 +14,18 @@ def init_db():
         CREATE TABLE IF NOT EXISTS sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             project_name TEXT NOT NULL,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            goal TEXT DEFAULT '',
+            guard_mode INTEGER DEFAULT 0
         )
     """)
+
+    # ── Migration: add goal / guard_mode to existing databases ──
+    for col, definition in [("goal", "TEXT DEFAULT ''"), ("guard_mode", "INTEGER DEFAULT 0")]:
+        try:
+            cursor.execute(f"ALTER TABLE sessions ADD COLUMN {col} {definition}")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
 
     # ── Interactions table ──────────────────────────────────────
     cursor.execute("""
@@ -49,9 +58,13 @@ def init_db():
 #  Session helpers
 # ═══════════════════════════════════════════════════════════════
 
-def create_session(project_name):
+def create_session(project_name, goal=""):
     """Creates a new session and returns its id.
     Returns None if a session with the same name already exists.
+
+    Args:
+        project_name: Unique name for the session.
+        goal: Optional description of the session's purpose / topic.
     """
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -67,8 +80,8 @@ def create_session(project_name):
 
     created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     cursor.execute(
-        "INSERT INTO sessions (project_name, created_at) VALUES (?, ?)",
-        (project_name, created_at),
+        "INSERT INTO sessions (project_name, created_at, goal, guard_mode) VALUES (?, ?, ?, 0)",
+        (project_name, created_at, goal),
     )
     session_id = cursor.lastrowid
     conn.commit()
@@ -77,10 +90,10 @@ def create_session(project_name):
 
 
 def list_sessions():
-    """Returns all sessions as a list of (id, project_name, created_at)."""
+    """Returns all sessions as a list of (id, project_name, created_at, goal, guard_mode)."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT id, project_name, created_at FROM sessions ORDER BY id")
+    cursor.execute("SELECT id, project_name, created_at, goal, guard_mode FROM sessions ORDER BY id")
     rows = cursor.fetchall()
     conn.close()
     return rows
@@ -97,6 +110,94 @@ def get_session_by_id(session_id):
     row = cursor.fetchone()
     conn.close()
     return row
+
+
+def get_session_goal(session_id):
+    """Returns the goal string for a session, or '' if not set."""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT goal FROM sessions WHERE id = ?", (session_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return (row[0] or "") if row else ""
+
+
+def get_session_guard(session_id):
+    """Returns True if guard mode is enabled for the session."""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT guard_mode FROM sessions WHERE id = ?", (session_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return bool(row[0]) if row else False
+
+
+def set_session_guard(session_id, enabled):
+    """Enables or disables guard mode for a session."""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE sessions SET guard_mode = ? WHERE id = ?",
+        (1 if enabled else 0, session_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_session_summary(session_id):
+    """Returns aggregated stats for a session as a dict."""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    # Session metadata
+    cursor.execute(
+        "SELECT project_name, created_at, goal, guard_mode FROM sessions WHERE id = ?",
+        (session_id,),
+    )
+    meta = cursor.fetchone()
+    if not meta:
+        conn.close()
+        return None
+
+    project_name, created_at, goal, guard_mode = meta
+
+    # Interaction stats
+    cursor.execute(
+        "SELECT COUNT(*), SUM(relevance) FROM interactions WHERE session_id = ?",
+        (session_id,),
+    )
+    total, relevant = cursor.fetchone()
+    total = total or 0
+    relevant = int(relevant or 0)
+
+    # Distinct files
+    cursor.execute(
+        "SELECT DISTINCT file_path FROM interactions WHERE session_id = ? AND file_path IS NOT NULL AND file_path != ''",
+        (session_id,),
+    )
+    files = [r[0] for r in cursor.fetchall()]
+
+    # Last 5 prompts (newest first)
+    cursor.execute(
+        "SELECT prompt, timestamp FROM interactions WHERE session_id = ? ORDER BY id DESC LIMIT 5",
+        (session_id,),
+    )
+    recent = cursor.fetchall()
+
+    conn.close()
+
+    return {
+        "id": session_id,
+        "project_name": project_name,
+        "created_at": created_at,
+        "goal": goal or "",
+        "guard_mode": bool(guard_mode),
+        "total": total,
+        "relevant": relevant,
+        "irrelevant": total - relevant,
+        "files": files,
+        "recent_prompts": recent,  # list of (prompt, timestamp)
+    }
 
 
 # ═══════════════════════════════════════════════════════════════

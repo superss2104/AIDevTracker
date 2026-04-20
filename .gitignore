@@ -67,3 +67,5 @@ ai_dev_tracker_export.csv
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+*pdf

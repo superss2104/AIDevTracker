@@ -144,7 +144,7 @@ def generate_report(session_id=None, threshold=0.4):
             rapid_files.append((file, rapid))
 
         # Sustained struggle: 3+ prompts within a 30-min rolling window
-        if _has_sustained_struggle(timestamps, window_minutes=30, min_prompts=3):
+        if _has_sustained_struggle(timestamps, window_minutes=30, min_prompts=7):
             sustained_files.append(file)
 
         # Escalation struggle: Prompt frequency accelerating over time

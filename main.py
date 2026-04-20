@@ -5,7 +5,11 @@ import os
 import re
 from difflib import SequenceMatcher
 from dotenv import load_dotenv
-from db import init_db, save_interaction, get_first_response_for_file
+from db import (
+    init_db, save_interaction, get_first_response_for_file,
+    get_session_goal, get_session_guard, get_first_prompt_for_file,
+    get_recent_interactions,
+)
 from ai_client import ask_gpt
 from git_utils import get_current_commit
 from cli import run
@@ -14,7 +18,7 @@ load_dotenv()
 
 # ── Known providers (base_url, default_model) ────────────────────────────────
 PROVIDERS = {
-    "1": ("Gemini",  "https://generativelanguage.googleapis.com/v1beta/openai/", "gemini-2.0-flash"),
+    "1": ("Gemini",  "https://generativelanguage.googleapis.com/v1beta/openai/", "gemini-2.5-flash"),
     "2": ("OpenAI",  "https://api.openai.com/v1",                               "gpt-4o-mini"),
     "3": ("Groq",    "https://api.groq.com/openai/v1",                           "llama-3.3-70b-versatile"),
 }
@@ -35,10 +39,10 @@ def _ensure_llm_config():
         # Migrate silently
         update_env_key("LLM_API_KEY", old_key)
         update_env_key("LLM_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
-        update_env_key("LLM_MODEL", "gemini-2.0-flash")
+        update_env_key("LLM_MODEL", "gemini-2.5-flash")
         os.environ["LLM_API_KEY"] = old_key
         os.environ["LLM_BASE_URL"] = "https://generativelanguage.googleapis.com/v1beta/openai/"
-        os.environ["LLM_MODEL"] = "gemini-2.0-flash"
+        os.environ["LLM_MODEL"] = "gemini-2.5-flash"
         print("✔ Migrated existing Gemini key to new LLM config.\n")
         return
 
@@ -173,20 +177,88 @@ def compute_relevance(response_text, file_path, session_id=None):
 
 
 def ask(prompt, file_path=None, session_id=None, threshold=None):
-    """Send a prompt to the AI, log interaction, and score relevance."""
+    """Send a prompt to the AI, log interaction, and score relevance.
+
+    Structured-session enforcement order (when session_id is set):
+      1. Hard block  — if guard_mode is on AND relevance < threshold, reject.
+      2. Soft warn   — if guard_mode is off AND relevance < threshold, ask y/N.
+      3. Proceed     — send to AI with session_goal injected as system prompt.
+    """
     if threshold is None:
         threshold = THRESHOLD
 
+    # ── Fetch session context ─────────────────────────────────────────────────
+    session_goal = ""
+    guard_mode = False
+    if session_id is not None:
+        session_goal = get_session_goal(session_id)
+        guard_mode = get_session_guard(session_id)
+
+    # ── Pre-flight relevance check ────────────────────────────────────────────
+    # Compare the new prompt against MULTIPLE context sources and take the MAX
+    # score.  This prevents valid follow-ups ("What about java?") from being
+    # blocked just because they don't share keywords with the very first prompt.
+    #
+    # Sources checked:
+    #   1. First prompt for the same file  (topical anchor)
+    #   2. Session goal                    (overall session scope)
+    #   3. Most recent prompt + response   (conversational continuity)
+    if session_id is not None and file_path:
+        base_prompt = get_first_prompt_for_file(file_path, session_id=session_id)
+        if base_prompt is not None:
+            scores = [_keyword_overlap(prompt, base_prompt)]
+
+            # Session goal comparison
+            if session_goal:
+                scores.append(_keyword_overlap(prompt, session_goal))
+
+            # Most recent interaction comparison (prompt + response combined)
+            recent = get_recent_interactions(limit=1, session_id=session_id)
+            if recent:
+                last_prompt, last_response = recent[-1]
+                combined_context = f"{last_prompt} {last_response}"
+                scores.append(_keyword_overlap(prompt, combined_context))
+
+            pre_score = max(scores)
+
+            if pre_score < threshold:
+                if guard_mode:
+                    print(f"\n🚫  GUARD MODE: Prompt blocked — off-topic for this session.")
+                    if session_goal:
+                        print(f"    Session goal : {session_goal}")
+                    print(f"    Relevance    : {pre_score:.2f} (threshold: {threshold})")
+                    print("    Use 'python main.py session guard off' to disable hard blocking.\n")
+                    return
+                else:
+                    print(f"\n⚠   Off-topic warning: this query may not be relevant to the current session.")
+                    if session_goal:
+                        print(f"    Session goal : {session_goal}")
+                    print(f"    Relevance    : {pre_score:.2f} (threshold: {threshold})")
+                    try:
+                        confirm = input("    Proceed anyway? [y/N]: ").strip().lower()
+                    except EOFError:
+                        confirm = "n"
+                    if confirm != "y":
+                        print("    Prompt cancelled.\n")
+                        return
+                    print()
+
     print(f"\nThinking...  [threshold={threshold}]\n")
 
-    ai_result = ask_gpt(prompt, session_id=session_id)
+    ai_result = ask_gpt(prompt, session_id=session_id, session_goal=session_goal)
 
     response_text = ai_result["text"]
     model_used = ai_result["model"]
     response_time = ai_result["response_time"]
 
     print("AI Response:\n")
-    print(response_text)
+    try:
+        from rich.console import Console
+        from rich.markdown import Markdown
+        console = Console()
+        console.print(Markdown(response_text))
+    except ImportError:
+        print(response_text)
 
     commit_hash = get_current_commit()
 
@@ -196,7 +268,7 @@ def ask(prompt, file_path=None, session_id=None, threshold=None):
     relevance_score = compute_relevance(response_text, file_path, session_id=session_id)
     relevance = 1 if relevance_score >= threshold else 0
 
-    print(f"\n📊 Relevance Score: {relevance_score:.4f} ({'AI-contributed' if relevance else 'Not contributing'}) [threshold={threshold}]")
+    print(f"\n\U0001f4ca Relevance Score: {relevance_score:.4f} ({'AI-contributed' if relevance else 'Not contributing'}) [threshold={threshold}]")
 
     save_interaction(
         prompt,

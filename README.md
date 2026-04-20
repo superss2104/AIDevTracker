@@ -13,6 +13,7 @@ As developers increasingly rely on AI tools (e.g., ChatGPT, Claude), there is no
 - Link AI responses to code changes
 - Measure AI contribution to final software
 - Identify areas where developers struggled
+- Maintain structured, goal-driven development sessions
 
 This tool provides a structured solution to record, analyze, and report AI-assisted development activity.
 
@@ -26,8 +27,9 @@ Modern software development increasingly integrates AI-generated code. However, 
 - Link AI interactions to version control
 - Identify which parts of code were AI-generated
 - Analyze developer struggle through AI usage patterns
+- Ensure session coherence when developers ask unrelated questions mid-session
 
-AI-Dev-Tracker addresses this by creating a Git-linked AI interaction logging and analysis system.
+AI-Dev-Tracker addresses this by creating a Git-linked AI interaction logging and analysis system with structured session flow enforcement.
 
 ---
 
@@ -35,14 +37,21 @@ AI-Dev-Tracker addresses this by creating a Git-linked AI interaction logging an
 
 - **Multi-LLM support** — works with any OpenAI-compatible provider (Gemini, OpenAI, Groq, Mistral, etc.)
 - **Interactive model switching** — select a provider at startup or switch anytime via CLI
+- **Structured session flow** — goal-driven sessions with relevance enforcement
+  - **Session goals** — attach a purpose/topic to each session
+  - **Soft warning** — warns when a prompt appears off-topic, asks to confirm
+  - **Guard mode** — hard-blocks off-topic prompts entirely (opt-in)
+  - **AI system prompt scoping** — the AI is instructed to stay on-topic and redirect unrelated questions
+  - **Session summary** — view a structured overview of the current session at any time
 - CLI-based prompt logging
-- AI response tracking
+- AI response tracking with **rich markdown rendering** in the terminal
 - Session-based project management
 - Git commit hash integration
 - File-wise prompt mapping
-- Similarity-based relevance detection
+- Multi-source relevance detection (keyword overlap against first prompt, session goal, and recent conversation)
 - AI contribution reporting
 - Struggle detection (rapid-prompt, sustained, escalating, long-session)
+
 
 ---
 
@@ -50,7 +59,7 @@ AI-Dev-Tracker addresses this by creating a Git-linked AI interaction logging an
 
 1. Clone the repo and install dependencies:
    ```bash
-   pip install openai python-dotenv
+   pip install openai python-dotenv rich
    ```
 
 2. On first run, you'll be prompted to select your LLM provider:
@@ -67,23 +76,78 @@ AI-Dev-Tracker addresses this by creating a Git-linked AI interaction logging an
    LLM_API_KEY=your_api_key_here
    LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
    LLM_MODEL=gemini-2.5-flash
+   RELEVANCE_THRESHOLD=0.4
    ```
 
 ---
 
 ## 🔧 CLI Commands
 
+### Core Commands
+
 ```bash
-python main.py ask "prompt" [file.py]         # Ask the AI
-python main.py analyze [file.py]               # Run analysis
-python main.py report                          # Generate report
+python main.py ask "prompt" [file.py]         # Ask the AI (with optional file context)
+python main.py analyze [file.py]               # Run analysis (repo-wide or per-file)
+python main.py report                          # Generate detailed AI contribution report
 python main.py visualize                       # Show visual summary
-python main.py export [output.csv]             # Export to CSV
-python main.py session <new|list|use> [args]   # Manage sessions
-python main.py model                           # Switch LLM (interactive)
-python main.py model <KEY> --base-url <URL> --model <MODEL>  # Switch LLM (direct)
+python main.py export [output.csv]             # Export interactions to CSV
 ```
 
+### Session Management
+
+```bash
+python main.py session new "Project Name" [--goal "Session goal"]   # Create a new session
+python main.py session list                                         # List all sessions
+python main.py session use <id>                                     # Switch active session
+python main.py session guard <on|off>                               # Toggle hard-block guard mode
+python main.py session summary                                      # Show active session overview
+```
+
+### Model Configuration
+
+```bash
+python main.py model                                                # Switch LLM (interactive)
+python main.py model <KEY> --base-url <URL> --model <MODEL>         # Switch LLM (direct)
+```
+
+### Global Flags
+
+```bash
+python main.py --threshold <0.0-1.0> <command>                     # Override relevance threshold
+```
+
+---
+
+## 🛡️ Structured Session Flow
+
+Sessions can be created with a **goal** that defines the session's purpose. This enables:
+
+1. **AI System Prompt Scoping** — the AI is primed to stay focused on the session goal and redirect off-topic questions.
+2. **Pre-flight Relevance Check** — before each AI call, the prompt is compared against three context sources using keyword overlap:
+   - First prompt for the file (topical anchor)
+   - Session goal (overall scope)
+   - Most recent prompt + response (conversational continuity)
+   - The **max** of all scores is used — if relevant to *any* source, the prompt passes.
+3. **Soft Warning** (default) — if the prompt scores below the threshold, the developer is warned and asked `Proceed anyway? [y/N]`.
+4. **Guard Mode** (opt-in) — when enabled via `session guard on`, off-topic prompts are hard-blocked with no AI call made.
+
+```
+Developer: python main.py ask "..." file.py
+              │
+              ▼
+     Session active AND file has a prior prompt?
+              │
+        Yes   ├── max(keyword_overlap scores) < threshold?
+              │         │
+              │    Yes   ├── guard_mode ON  → 🚫 HARD BLOCK
+              │          └── guard_mode OFF → ⚠  Soft warn → y/N
+              │    No    └── Proceed
+              ▼
+     AI responds (system prompt scoped to session goal)
+              │
+              ▼
+     Relevance scored → Interaction saved to DB
+```
 
 ---
 
@@ -105,25 +169,42 @@ python main.py model <KEY> --base-url <URL> --model <MODEL>  # Switch LLM (direc
 
 AI contribution is measured using the following metrics:
 
-1. Prompt Count per File  
+1. **Prompt Count per File**
    - Number of AI prompts linked to a specific file.
 
-2. Git Commit Linkage  
+2. **Git Commit Linkage**
    - Each prompt is associated with a commit hash.
 
-3. Similarity-Based Relevance Detection  
-   - Text similarity between AI response and final file content.
-   - Uses SequenceMatcher ratio.
-   - Default threshold = 0.4
+3. **Hybrid Relevance Detection**
+   - Two methods are used and the **higher** score is taken:
+     - `SequenceMatcher` — catches verbatim text/code reuse
+     - `Keyword Overlap` — catches topical relevance (shared terms)
+   - Default threshold = 0.4 (configurable via `.env` or `--threshold` flag)
 
-4. Relevance Classification  
-   - If similarity > 0.4 → Marked as AI-contributed.
+4. **Relevance Classification**
+   - If score ≥ threshold → Marked as AI-contributed.
    - Otherwise → Marked as non-contributing interaction.
+
+5. **Struggle Detection**
+   - Rapid-prompt struggle (< 5 min between prompts)
+   - Sustained struggle (3+ prompts within a 30-min window)
+   - Escalating dependency (prompt frequency accelerating over time)
+   - Long session (continuous AI usage over 2+ hours on a file)
 
 These metrics help identify:
 - AI-dependent modules
 - Developer struggle areas
 - AI usage intensity across project timeline
+
+---
+
+## 📋 Metadata Captured
+
+Per-interaction: `prompt`, `response`, `file_path`, `commit_hash`, `timestamp`, `prompt_length`, `response_length`, `model_used`, `response_time`, `relevance`, `session_id`
+
+Per-session: `project_name`, `created_at`, `goal`, `guard_mode`
+
+See [metadata.md](metadata.md) for the full reference.
 
 ---
 
