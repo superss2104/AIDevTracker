@@ -238,13 +238,14 @@ AIDevTracker/
 
 ## 🏗️ System Architecture
 
-![System Architecture](images/architecture.jpg)
+<img width="1600" height="537" alt="architecture" src="https://github.com/user-attachments/assets/fb467d21-a14f-424e-a726-84cde680cdc7" />
 
 ---
 
 ## 🔄 Workflow Chart
 
-![Workflow Chart](images/workflow.jpg)
+<img width="1600" height="1249" alt="workflow" src="https://github.com/user-attachments/assets/2a4da0b9-8570-4072-a476-294ee8e84b0d" />
+
 ---
 
 ## 📊 AI Contribution Evaluation Methodology
