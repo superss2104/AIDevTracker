@@ -1,5 +1,5 @@
 from collections import defaultdict
-from db import get_all_interactions, get_session_by_id
+from .db import get_all_interactions, get_session_by_id
 
 
 def show_summary(session_id=None):

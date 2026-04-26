@@ -52,68 +52,131 @@ AI-Dev-Tracker addresses this by creating a Git-linked AI interaction logging an
 - AI contribution reporting
 - Struggle detection (rapid-prompt, sustained, escalating, long-session)
 
+---
+
+## ⚙️ Setup & Installation
+
+### Prerequisites
+
+- Python 3.8 or higher
+- Git (for commit hash integration)
+- An API key from any OpenAI-compatible provider (Gemini, OpenAI, Groq, etc.)
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/superss2104/AIDevTracker
+cd AIDevTracker
+```
+
+### 2. Install as a Package (Recommended)
+
+Installing via `setup.py` registers the `aidt` command globally so you can run it from anywhere:
+
+```bash
+pip install -e .
+```
+
+This installs all dependencies (`openai`, `python-dotenv`, `rich`) automatically and creates the `aidt` CLI entry point.
+
+> **Verify the installation:**
+> ```bash
+> aidt
+> ```
+> You should see the usage/help output.
+
+### 3. Configure Your LLM Provider
+
+**Option A — Interactive (on first run):**
+
+Run any command and you'll be prompted to select your provider:
+```
+Select your LLM provider:
+  1. Gemini
+  2. OpenAI
+  3. Groq
+  4. Other (custom base URL)
+```
+
+**Option B — Manual `.env` file:**
+
+Create a `.env` file in the project root (copy from `.env.example`):
+
+```env
+LLM_API_KEY=your_api_key_here
+LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
+LLM_MODEL=gemini-2.5-flash
+RELEVANCE_THRESHOLD=0.4
+```
+
+| Variable | Description | Example |
+|---|---|---|
+| `LLM_API_KEY` | Your provider's API key | `sk-...` |
+| `LLM_BASE_URL` | OpenAI-compatible base URL | See provider docs |
+| `LLM_MODEL` | Model name to use | `gemini-2.5-flash` |
+| `RELEVANCE_THRESHOLD` | Off-topic detection cutoff (0.0–1.0) | `0.4` |
+
+Common provider URLs:
+- **Gemini:** `https://generativelanguage.googleapis.com/v1beta/openai/`
+- **OpenAI:** `https://api.openai.com/v1/`
+- **Groq:** `https://api.groq.com/openai/v1/`
 
 ---
 
-## ⚙️ Setup
+## 🔧 Running the Application
 
-1. Clone the repo and install dependencies:
-   ```bash
-   pip install openai python-dotenv rich
-   ```
-
-2. On first run, you'll be prompted to select your LLM provider:
-   ```
-   Select your LLM provider:
-     1. Gemini
-     2. OpenAI
-     3. Groq
-     4. Other (custom base URL)
-   ```
-
-3. Or configure manually in `.env`:
-   ```env
-   LLM_API_KEY=your_api_key_here
-   LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
-   LLM_MODEL=gemini-2.5-flash
-   RELEVANCE_THRESHOLD=0.4
-   ```
-
----
-
-## 🔧 CLI Commands
+All commands use the `aidt` entry point after installation. If you have not installed via `pip install -e .`, you can substitute `aidt` with `python -m aidevtracker.main`.
 
 ### Core Commands
 
 ```bash
-python main.py ask "prompt" [file.py]         # Ask the AI (with optional file context)
-python main.py analyze [file.py]               # Run analysis (repo-wide or per-file)
-python main.py report                          # Generate detailed AI contribution report
-python main.py visualize                       # Show visual summary
-python main.py export [output.csv]             # Export interactions to CSV
+aidt ask "your prompt here" [file.py]       # Ask the AI (with optional file context)
+aidt analyze [file.py]                       # Run analysis (repo-wide or per-file)
+aidt report                                  # Generate detailed AI contribution report
+aidt visualize                               # Show visual summary in terminal
+aidt export [output.csv]                     # Export all interactions to CSV
 ```
 
 ### Session Management
 
 ```bash
-python main.py session new "Project Name" [--goal "Session goal"]   # Create a new session
-python main.py session list                                         # List all sessions
-python main.py session use <id>                                     # Switch active session
-python main.py session guard <on|off>                               # Toggle hard-block guard mode
-python main.py session summary                                      # Show active session overview
+aidt session new "Project Name" [--goal "Session goal"]   # Create a new session
+aidt session list                                          # List all sessions
+aidt session use <id>                                      # Switch active session
+aidt session guard <on|off>                                # Toggle hard-block guard mode
+aidt session summary                                       # Show active session overview
 ```
 
 ### Model Configuration
 
 ```bash
-python main.py model                                                # Switch LLM (interactive)
-python main.py model <KEY> --base-url <URL> --model <MODEL>         # Switch LLM (direct)
+aidt model                                                 # Switch LLM provider (interactive)
+aidt model <API_KEY> --base-url <URL> --model <MODEL>      # Switch LLM provider (direct)
 ```
 
 ### Global Flags
 
 ```bash
-python main.py --threshold <0.0-1.0> <command>                     # Override relevance threshold
+aidt --threshold <0.0-1.0> <command>                       # Override relevance threshold for one command
+```
+
+### Quick Start Example
+
+```bash
+# 1. Install the package
+pip install -e .
+
+# 2. Create a new session with a goal
+aidt session new "My Web App" --goal "Building the authentication module"
+
+# 3. Ask the AI a question scoped to a file
+aidt ask "How should I structure JWT token validation?" auth.py
+
+# 4. Run an analysis on your repo
+aidt analyze
+
+# 5. Generate a contribution report
+aidt report
 ```
 
 ---
@@ -129,10 +192,10 @@ Sessions can be created with a **goal** that defines the session's purpose. This
    - Most recent prompt + response (conversational continuity)
    - The **max** of all scores is used — if relevant to *any* source, the prompt passes.
 3. **Soft Warning** (default) — if the prompt scores below the threshold, the developer is warned and asked `Proceed anyway? [y/N]`.
-4. **Guard Mode** (opt-in) — when enabled via `session guard on`, off-topic prompts are hard-blocked with no AI call made.
+4. **Guard Mode** (opt-in) — when enabled via `aidt session guard on`, off-topic prompts are hard-blocked with no AI call made.
 
 ```
-Developer: python main.py ask "..." file.py
+Developer: aidt ask "..." file.py
               │
               ▼
      Session active AND file has a prior prompt?
@@ -151,18 +214,37 @@ Developer: python main.py ask "..." file.py
 
 ---
 
+## 🏗️ Project Structure
+
+```
+AIDevTracker/
+├── aidevtracker/            # Main Python package
+│   ├── __init__.py
+│   ├── main.py              # Entry point (CLI argument parsing)
+│   ├── cli.py               # Command implementations
+│   ├── ai_client.py         # LLM provider abstraction
+│   ├── analyzer.py          # Relevance & contribution analysis
+│   ├── db.py                # SQLite database layer
+│   ├── env_utils.py         # .env loading & model configuration
+│   ├── git_utils.py         # Git commit hash integration
+│   └── visualizer.py        # Terminal visualizations
+├── setup.py                 # Package install config (creates `aidt` command)
+├── .env.example             # Environment variable template
+├── metadata.md              # Full metadata field reference
+└── README.md
+```
+
+---
+
 ## 🏗️ System Architecture
 
-
-
-![WhatsApp Image 2026-03-17 at 8 34 41 AM](https://github.com/user-attachments/assets/4ecb67f4-06d6-4578-864d-d555f8ed498a)
+![System Architecture](images/architecture.jpg)
 
 ---
 
 ## 🔄 Workflow Chart
 
-![WhatsApp Image 2026-03-14 at 1 38 14 PM](https://github.com/user-attachments/assets/734ade65-a637-4657-9090-1daf89aeaa31)
-
+![Workflow Chart](images/workflow.jpg)
 ---
 
 ## 📊 AI Contribution Evaluation Methodology
@@ -247,7 +329,3 @@ This project is developed as part of a Software Engineering Lab to study:
 - Software maintainability analysis
 
 ---
-
-## 📜 License
-
-Academic Project – Educational Use Only

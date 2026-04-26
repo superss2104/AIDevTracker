@@ -3,7 +3,7 @@ import time
 import difflib
 from openai import OpenAI
 from dotenv import load_dotenv
-from db import get_recent_interactions
+from .db import get_recent_interactions
 
 load_dotenv()
 

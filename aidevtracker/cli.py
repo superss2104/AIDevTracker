@@ -34,9 +34,9 @@ def run(ask_fn, threshold=0.4):
     """
 
     # Lazy imports to avoid circular dependencies
-    from analyzer import analyze_repo, generate_report, analyze_file
-    from visualizer import show_summary, show_file_summary
-    from db import export_to_csv
+    from .analyzer import analyze_repo, generate_report, analyze_file
+    from .visualizer import show_summary, show_file_summary
+    from .db import export_to_csv
 
     # ── Strip --threshold from argv before command routing ────────────────
     args = sys.argv[1:]
@@ -106,7 +106,7 @@ def run(ask_fn, threshold=0.4):
 
 def _handle_visualize(session_id=None):
     """Runs both visualization views, scoped to the active session."""
-    from visualizer import show_summary, show_file_summary
+    from .visualizer import show_summary, show_file_summary
     show_summary(session_id=session_id)
     show_file_summary(session_id=session_id)
 
@@ -116,7 +116,7 @@ def _handle_model():
     - No args  → interactive provider selection (same as first-time setup)
     - With args → direct: python main.py model <KEY> [--base-url URL] [--model MODEL]
     """
-    from env_utils import update_env_key
+    from .env_utils import update_env_key
 
     # ── Interactive mode (no extra args) ─────────────────────────────────
     if len(sys.argv) <= 2:
@@ -195,7 +195,7 @@ def _handle_model():
 
 def _handle_session():
     """Handles session sub-commands: new, list, use, guard, summary."""
-    from db import create_session, list_sessions, get_session_by_id, set_session_guard, get_session_summary
+    from .db import create_session, list_sessions, get_session_by_id, set_session_guard, get_session_summary
 
     if len(sys.argv) < 3:
         print("Usage: python main.py session <new|list|use|guard|summary> [args]")

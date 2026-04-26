@@ -2,7 +2,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 import ast
 import os
-from db import get_all_interactions, get_time_gaps, get_session_by_id
+from .db import get_all_interactions, get_time_gaps, get_session_by_id
 
 
 # ─────────────────────────────────────────────
